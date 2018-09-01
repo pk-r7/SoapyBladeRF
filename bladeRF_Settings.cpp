@@ -917,12 +917,15 @@ SoapySDR::ArgInfoList bladeRF_SoapySDR::getSettingInfo(void) const
     // Device reset
     SoapySDR::ArgInfo resetArg;
     resetArg.key = "reset";
-    resetArg.value = "true";
+    resetArg.value = "false";
     resetArg.name = "Reset Device";
     resetArg.description = "Reset the device, causing it to reload its firmware from flash.";
     resetArg.type = SoapySDR::ArgInfo::STRING;
+    resetArg.options.push_back("false");
+    resetArg.optionNames.push_back("False");
     resetArg.options.push_back("true");
     resetArg.optionNames.push_back("True");
+
 
     setArgs.push_back(resetArg);
 
@@ -933,6 +936,8 @@ SoapySDR::ArgInfoList bladeRF_SoapySDR::getSettingInfo(void) const
     eraseArg.name = "Erase the FPGA region of flash";
     eraseArg.description = "Erase the FPGA region of SPI flash, effectively disabling FPGA autoloading.";
     eraseArg.type = SoapySDR::ArgInfo::STRING;
+    eraseArg.options.push_back("false");
+    eraseArg.optionNames.push_back("False");
     eraseArg.options.push_back("true");
     eraseArg.optionNames.push_back("True");
 
@@ -961,10 +966,12 @@ SoapySDR::ArgInfoList bladeRF_SoapySDR::getSettingInfo(void) const
     // Jump to bootloader
     SoapySDR::ArgInfo bootloaderArg;
     bootloaderArg.key = "jump_to_bootloader";
-    bootloaderArg.value = "true";
+    bootloaderArg.value = "false";
     bootloaderArg.name = "Clear out a firmware signature word in flash and jump to FX3 bootloader";
     bootloaderArg.description = "The device will continue to boot into the FX3 bootloader across power cycles until new firmware is written to the device.";
     bootloaderArg.type = SoapySDR::ArgInfo::STRING;
+    bootloaderArg.options.push_back("false");
+    bootloaderArg.optionNames.push_back("False");
     bootloaderArg.options.push_back("true");
     bootloaderArg.optionNames.push_back("True");
 
@@ -1124,44 +1131,47 @@ void bladeRF_SoapySDR::writeSetting(const std::string &key, const std::string &v
         #endif
     }
     else if (key == "sampling_mode")
-    {
-        /* Configure the sampling of the LMS6002D to be either internal or external.
-        ** Internal sampling will read from the RXVGA2 driver internal to the chip.
-        ** External sampling will connect the ADC inputs to the external inputs for direct sampling.
-        */
-
-        // Verify that a valid setting has arrived
-        std::vector<std::string> sampling_mode_validSettings{ "internal", "external" };
-        if (std::find(std::begin(sampling_mode_validSettings), std::end(sampling_mode_validSettings), value) != std::end(sampling_mode_validSettings))
         {
-            // --> Valid setting has arrived
-            _samplingMode = value;
+        if (variant == BLADERF_FPGA_115KLE or variant == BLADERF_FPGA_40KLE)
+        {
+            /* Configure the sampling of the LMS6002D to be either internal or external.
+            ** Internal sampling will read from the RXVGA2 driver internal to the chip.
+            ** External sampling will connect the ADC inputs to the external inputs for direct sampling.
+            */
 
-            // Set the sampling mode
-            int ret = 0;
-            if (value == "external")
+            // Verify that a valid setting has arrived
+            std::vector<std::string> sampling_mode_validSettings{ "internal", "external" };
+            if (std::find(std::begin(sampling_mode_validSettings), std::end(sampling_mode_validSettings), value) != std::end(sampling_mode_validSettings))
             {
-                // External/direct sampling
-                SoapySDR::logf(SOAPY_SDR_INFO, "bladeRF: Set sampling mode to direct/external sampling", value.c_str());
-                ret = bladerf_set_sampling(_dev, bladerf_sampling::BLADERF_SAMPLING_EXTERNAL);
+                // --> Valid setting has arrived
+                _samplingMode = value;
+
+                // Set the sampling mode
+                int ret = 0;
+                if (value == "external")
+                {
+                    // External/direct sampling
+                    SoapySDR::logf(SOAPY_SDR_INFO, "bladeRF: Set sampling mode to direct/external sampling", value.c_str());
+                    ret = bladerf_set_sampling(_dev, bladerf_sampling::BLADERF_SAMPLING_EXTERNAL);
+                }
+                else
+                {
+                    // Default: Internal
+                    SoapySDR::logf(SOAPY_SDR_INFO, "bladeRF: Set sampling mode to internal sampling", value.c_str());
+                    ret = bladerf_set_sampling(_dev, bladerf_sampling::BLADERF_SAMPLING_INTERNAL);
+                }
+                if (ret != 0)
+                {
+                    SoapySDR::logf(SOAPY_SDR_ERROR, "bladerf_set_sampling(%s) returned %s", value.c_str(), _err2str(ret).c_str());
+                    throw std::runtime_error("writeSetting() " + _err2str(ret));
+                }
             }
             else
             {
-                // Default: Internal
-                SoapySDR::logf(SOAPY_SDR_INFO, "bladeRF: Set sampling mode to internal sampling", value.c_str());
-                ret = bladerf_set_sampling(_dev, bladerf_sampling::BLADERF_SAMPLING_INTERNAL);
+                // --> Invalid setting has arrived
+                SoapySDR::logf(SOAPY_SDR_ERROR, "bladeRF: Invalid sampling mode '%s'", value.c_str());
+                //throw std::runtime_error("writeSetting(" + key + "," + value + ") unknown value");
             }
-            if (ret != 0)
-            {
-                SoapySDR::logf(SOAPY_SDR_ERROR, "bladerf_set_sampling(%s) returned %s", value.c_str(), _err2str(ret).c_str());
-                throw std::runtime_error("writeSetting() " + _err2str(ret));
-            }
-        }
-        else
-        {
-            // --> Invalid setting has arrived
-            SoapySDR::logf(SOAPY_SDR_ERROR, "bladeRF: Invalid sampling mode '%s'", value.c_str());
-            //throw std::runtime_error("writeSetting(" + key + "," + value + ") unknown value");
         }
     }
     else if (key == "loopback")
