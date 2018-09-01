@@ -1018,6 +1018,14 @@ std::string bladeRF_SoapySDR::readSetting(const std::string &key) const
 
 void bladeRF_SoapySDR::writeSetting(const std::string &key, const std::string &value)
 {
+        // Get board version
+    bladerf_fpga_size variant;
+    const int ret = bladerf_get_fpga_size(_dev, &variant);
+    if (ret != 0)
+    {
+        SoapySDR::logf(SOAPY_SDR_ERROR, "bladerf_get_fpga_size(%i) returned %s", variant, _err2str(ret).c_str());
+        throw std::runtime_error("listGains() " + _err2str(ret));
+    }
     if (key == "xb200")
     {
         #ifndef LIBBLADERF_V2
@@ -1488,3 +1496,4 @@ unsigned bladeRF_SoapySDR::readGPIODir(const std::string &bank) const
     if (ret != 0) throw std::runtime_error("readGPIODir("+bank+") " + _err2str(ret));
     return value;
 }
+
